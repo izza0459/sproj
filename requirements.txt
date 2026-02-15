@@ -1,0 +1,15 @@
+google-generativeai
+speechrecognition
+pyttsx3
+pvporcupine
+pyaudio
+transformers
+peft
+torch
+spotipy
+firebase-admin
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+ddgs
+parsedatetime

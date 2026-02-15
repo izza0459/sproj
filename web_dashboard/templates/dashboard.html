@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pengo OS</title>
+    <style>
+        /* --- CSS STYLES --- */
+        body { font-family: 'Segoe UI', sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+        
+        /* Header */
+        header { background-color: #1f1f1f; padding: 15px 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        h1 { margin: 0; font-size: 1.2rem; color: #fff; }
+        .status-dot { height: 10px; width: 10px; background-color: #00ff00; border-radius: 50%; display: inline-block; margin-right: 5px; }
+
+        /* Main Grid Layout */
+        .container { display: grid; grid-template-columns: 2fr 1fr; grid-template-rows: 2fr 1fr; gap: 20px; padding: 20px; flex: 1; height: 100%; overflow: hidden; }
+        
+        /* Cards */
+        .card { background-color: #1e1e1e; border-radius: 10px; padding: 20px; border: 1px solid #333; overflow-y: auto; display: flex; flex-direction: column; }
+        .card-title { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+
+        /* Area Specifics */
+        .log-area { grid-row: 1 / -1; /* Full height left column */ }
+        .todo-area { grid-column: 2; grid-row: 1; }
+        .notes-area { grid-column: 2; grid-row: 2; }
+
+        /* Logs */
+        .msg { padding: 8px 12px; margin-bottom: 8px; border-radius: 8px; font-size: 0.95rem; line-height: 1.4; max-width: 85%; }
+        .msg-User { background-color: #005a9e; color: white; align-self: flex-end; margin-left: auto; }
+        .msg-Pengo { background-color: #333; color: #ddd; align-self: flex-start; }
+        
+        /* Lists */
+        ul { list-style: none; padding: 0; }
+        li { padding: 8px 0; border-bottom: 1px solid #2a2a2a; font-size: 0.9rem; }
+        .note-item { background: #252526; padding: 10px; border-radius: 5px; margin-bottom: 5px; }
+        .note-title { font-weight: bold; color: #4caf50; font-size: 0.9rem; }
+        .note-content { font-size: 0.85rem; color: #bbb; margin-top: 4px; }
+
+        /* Command Input */
+        .input-bar { margin-top: auto; display: flex; gap: 10px; padding-top: 10px; }
+        input { flex: 1; background: #2d2d2d; border: 1px solid #444; color: white; padding: 10px; border-radius: 5px; }
+        button { background: #0078d4; border: none; color: white; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+        
+        /* Service Badges */
+        .service-badge { display: inline-block; padding: 4px 8px; font-size: 0.75rem; background: #2d2d2d; border-radius: 4px; margin-right: 5px; color: #aaa; }
+        .active { border-left: 3px solid #00ff00; }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1><span class="status-dot"></span> PENGO DASHBOARD</h1>
+        </div>
+        <div id="service-status">
+            </div>
+    </header>
+
+    <div class="container">
+        <div class="card log-area">
+            <div class="card-title">Activity Log</div>
+            <div id="chat-box" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column;"></div>
+            
+            <div class="input-bar">
+                <input type="text" id="cmd-input" placeholder="Send command..." onkeydown="if(event.key==='Enter') sendCommand()">
+                <button onclick="sendCommand()">Send</button>
+            </div>
+        </div>
+
+        <div class="card todo-area">
+            <div class="card-title">Pending Tasks</div>
+            <ul id="todo-list"></ul>
+        </div>
+
+        <div class="card notes-area">
+            <div class="card-title">Recent Notes</div>
+            <div id="notes-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- JAVASCRIPT LOGIC ---
+        
+        async function refreshDashboard() {
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+
+                // 1. Update Services Header
+                const statusDiv = document.getElementById('service-status');
+                statusDiv.innerHTML = `
+                    <span class="service-badge active">DB: ${data.services.database}</span>
+                    <span class="service-badge active">Spotify: ${data.services.spotify}</span>
+                `;
+
+                // 2. Update Logs
+                const chatBox = document.getElementById('chat-box');
+                // Only update if we have new messages to avoid jitter (simple check)
+                // For "Basic" version, we just rewrite it. 
+                chatBox.innerHTML = data.logs.map(log => 
+                    `<div class="msg msg-${log.speaker}">
+                        <strong>${log.speaker}:</strong> ${log.message}
+                     </div>`
+                ).join('');
+                
+                // 3. Update To-Do List
+                const todoList = document.getElementById('todo-list');
+                todoList.innerHTML = data.todos.length ? 
+                    data.todos.map(t => `<li>⬜ ${t.task}</li>`).join('') : 
+                    '<li style="color:#666">No pending tasks</li>';
+
+                // 4. Update Notes
+                const notesList = document.getElementById('notes-list');
+                notesList.innerHTML = data.notes.length ? 
+                    data.notes.map(n => 
+                        `<div class="note-item">
+                            <div class="note-title">${n.title}</div>
+                            <div class="note-content">${n.content}</div>
+                         </div>`
+                    ).join('') : '<div style="color:#666">No notes found</div>';
+
+            } catch (error) {
+                console.error("Error fetching data:", error);
+            }
+        }
+
+        async function sendCommand() {
+            const input = document.getElementById('cmd-input');
+            const text = input.value;
+            if (!text) return;
+
+            await fetch('/api/command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command: text })
+            });
+            input.value = '';
+            setTimeout(refreshDashboard, 500);
+        }
+
+        // Run every 2 seconds
+        setInterval(refreshDashboard, 2000);
+        refreshDashboard(); // Run immediately on load
+    </script>
+
+</body>
+</html>

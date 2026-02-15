@@ -1,0 +1,10 @@
+*.gguf
+*.pt
+*.ppn
+venv_sprok/
+__pycache__/
+*.gguf
+*.pt
+*.ppn
+venv_sprok/
+__pycache__/
